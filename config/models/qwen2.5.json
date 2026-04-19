@@ -1,0 +1,19 @@
+{
+  "default_model_id": "qwen2.5-0.5b",
+  "models": [
+    {
+      "model_id": "qwen2.5-0.5b",
+      "label": "Qwen2.5 0.5B",
+      "family": "qwen2.5",
+      "model_path": "Qwen/Qwen2.5-0.5B-Instruct",
+      "description": "Fast default model for the Android v1.0 demo."
+    },
+    {
+      "model_id": "qwen2.5-3b",
+      "label": "Qwen2.5 3B",
+      "family": "qwen2.5",
+      "model_path": "Qwen/Qwen2.5-3B-Instruct",
+      "description": "Larger Qwen2.5 model reserved for stronger responses on LAN."
+    }
+  ]
+}
