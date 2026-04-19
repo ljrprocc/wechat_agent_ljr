@@ -64,8 +64,10 @@ class ModelSpec:
 class RuntimeSettings:
     model_config_path: str
     default_model_id: str
+    device: str
     device_map: str
     torch_dtype: str
+    attn_implementation: str
     trust_remote_code: bool
     max_new_tokens: int
     temperature: float
@@ -80,8 +82,10 @@ class RuntimeSettings:
         return cls(
             model_config_path=os.getenv("QWEN_MODEL_CONFIG_PATH", "./config/models/qwen2.5.json"),
             default_model_id=os.getenv("QWEN_DEFAULT_MODEL_ID", "qwen2.5-0.5b"),
+            device=os.getenv("QWEN_DEVICE", "auto"),
             device_map=os.getenv("QWEN_DEVICE_MAP", "auto"),
             torch_dtype=os.getenv("QWEN_TORCH_DTYPE", "auto"),
+            attn_implementation=os.getenv("QWEN_ATTENTION_IMPL", ""),
             trust_remote_code=os.getenv("QWEN_TRUST_REMOTE_CODE", "0") == "1",
             max_new_tokens=_env_int("QWEN_MAX_NEW_TOKENS", 256),
             temperature=_env_float("QWEN_TEMPERATURE", 0.7),
@@ -250,12 +254,29 @@ class LocalQwenChat:
                 self.model_spec.model_path,
                 trust_remote_code=self.settings.trust_remote_code,
             )
-            self._model = AutoModelForCausalLM.from_pretrained(
-                self.model_spec.model_path,
-                torch_dtype=self.settings.torch_dtype,
-                device_map=self.settings.device_map,
-                trust_remote_code=self.settings.trust_remote_code,
-            ).eval()
+
+            attn_impl = self.settings.attn_implementation
+            if not attn_impl and torch.backends.mps.is_available() and self.settings.device != "cpu":
+                attn_impl = "eager"
+
+            load_kwargs: dict[str, Any] = {
+                "torch_dtype": self.settings.torch_dtype,
+                "trust_remote_code": self.settings.trust_remote_code,
+            }
+            if attn_impl:
+                load_kwargs["attn_implementation"] = attn_impl
+
+            if self.settings.device == "auto":
+                load_kwargs["device_map"] = self.settings.device_map
+                self._model = AutoModelForCausalLM.from_pretrained(
+                    self.model_spec.model_path,
+                    **load_kwargs,
+                ).eval()
+            else:
+                self._model = AutoModelForCausalLM.from_pretrained(
+                    self.model_spec.model_path,
+                    **load_kwargs,
+                ).to(torch.device(self.settings.device)).eval()
 
             if self._tokenizer.pad_token_id is None and self._tokenizer.eos_token_id is not None:
                 self._tokenizer.pad_token_id = self._tokenizer.eos_token_id
@@ -366,6 +387,11 @@ class LocalChatAgent:
             "default_model_id": self.registry.default_model_id,
             "supported_models": self.list_models(),
             "loaded_models": sorted(self._clients.keys()),
+            "device": self.settings.device,
+            "device_map": self.settings.device_map,
+            "attn_implementation": self.settings.attn_implementation or (
+                "eager" if torch.backends.mps.is_available() and self.settings.device != "cpu" else ""
+            ),
             "db_path": self.settings.db_path,
             "history_turns": self.settings.history_turns,
         }
