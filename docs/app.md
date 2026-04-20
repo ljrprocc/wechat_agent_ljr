@@ -43,6 +43,12 @@ qwen-2.5/
 - `PyTorch/Transformers + MPS` 仅作为实验路径
 - Apple Silicon 上如果要继续追本地 GPU 推理，优先研究 `MLX / mlx-lm`
 
+当前代码实现补充：
+
+- `backend/agent.py` 已经开始按 `MLX` 后端重构
+- 当前 API 侧模型调用固定走 `MLX`
+- `CPU + transformers` 仍保留为前一阶段的规划基线，不再代表当前实现状态
+
 补充说明：
 
 - 我们已经验证过 `CPU` 可以稳定跑通 v1.0 链路
