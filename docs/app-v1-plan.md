@@ -16,6 +16,10 @@
 - `v1.x` 暂时只支持 `Qwen2.5-0.5B` 和 `Qwen2.5-3B`
 - 后端必须保留模型选择接口，为 `v2.x` 的多模型能力做准备
 - v1.0 访问范围仅限局域网和模拟器，不考虑公网部署
+- v1.0 默认推理后端为 `CPU`
+- `PyTorch/Transformers + MPS` 标记为 experimental，不纳入 v1.0 验收标准
+- Apple Silicon GPU 路线改为单独研究 `MLX / mlx-lm`
+- 已预留独立实验脚本 [experiments/mlx_qwen_smoke.py](/Users/lijingru/code/qwen-2.5/experiments/mlx_qwen_smoke.py)，不并入 v1.0 主线
 
 ## v1.0 目标
 
@@ -46,6 +50,7 @@
 - 在接口协议中预留 `stream` 字段
 - v1.0 仅支持局域网访问
 - v1.0 支持 `Qwen2.5-0.5B` 与 `Qwen2.5-3B`
+- v1.0 默认使用 CPU 跑通演示链路
 
 ### Out of Scope
 
@@ -58,6 +63,7 @@
 - iOS 客户端
 - 微信小程序正式接入
 - 公网访问与外网部署
+- `MLX / mlx-lm` 实际接入
 
 ## 推荐目录结构
 
@@ -79,6 +85,7 @@ qwen-2.5/
 ├── docs/
 │   ├── app.md
 │   ├── app-v1-plan.md
+│   ├── mlx.md
 │   └── wechat.md
 ├── config/
 │   └── models/                 # v1.0 计划新增
@@ -118,6 +125,7 @@ qwen-2.5/
 - `model_id` 仅允许两个 Qwen2.5 规格
 - `stream` 字段存在但在 v1.0 固定返回非流式结果
 - 服务端默认面向局域网启动与联调
+- 使用 CPU 默认配置时可以稳定运行
 
 ### M2：Android Demo 客户端
 
@@ -153,6 +161,7 @@ qwen-2.5/
 - 局域网访问说明
 - 模型预热建议
 - 最小日志方案
+- Apple Silicon 后端策略说明
 
 验收标准：
 
@@ -160,6 +169,7 @@ qwen-2.5/
 - Android 模拟器可以打通一次完整对话
 - 至少覆盖一次首轮加载场景
 - 局域网内真机或模拟器至少一种方式可稳定联调
+- 明确区分 CPU 主线与 MPS/MLX 实验路线
 
 ## 建议实现顺序
 
@@ -209,6 +219,7 @@ qwen-2.5/
 - 延迟加载模型，但在文档里提供手动预热命令
 - 增加模型注册配置，哪怕 v1.0 只先支持两个 Qwen2.5 规格
 - `api_server` 与渠道回调入口彻底解耦
+- 默认以 CPU 路径作为 v1.0 交付基线
 
 ### Android 端
 
@@ -271,6 +282,18 @@ qwen-2.5/
 - `qwen2.5-3b` 作为可选模型保留
 - 用模型注册配置统一管理两者入口
 
+### 风险 5：Apple MPS 后端不稳定
+
+影响：
+
+- 在 Apple Silicon 上，`PyTorch/Transformers + MPS` 可能在生成阶段失败
+
+缓解：
+
+- v1.0 统一默认 CPU
+- MPS 仅保留为实验路径
+- Apple GPU 方案转向 `MLX / mlx-lm`
+
 ## v1.0 评审重点
 
 建议你审阅时重点看这几项：
@@ -280,6 +303,7 @@ qwen-2.5/
 - `stream` 字段只保留不实现的策略是否合适
 - 单页聊天界面是否已经足够支撑 v1.0 Demo
 - “对话管理”是否放入 `v1.x` 再讨论实现
+- 是否接受 `CPU default / MPS experimental / MLX follow-up` 这条后端策略
 
 ## 进入开发前的决策
 
@@ -296,5 +320,6 @@ v1.0 的目标应保持克制：
 - 先证明“本地模型服务可被 Android 客户端稳定调用”
 - 不要在 v1.0 同时追求真正的多模型家族切换、流式输出和图像生成
 - 但接口层要为 `v1.x` 和 `v2.x` 的扩展留好位置
+- Apple Silicon GPU 推理能力放到单独的 `MLX` 路线中推进
 
 这份计划完成后，下一步应该是“审阅并确认范围”，而不是直接开始编码。

@@ -35,6 +35,23 @@ qwen-2.5/
 - 通用对话服务位于 [backend/agent.py](/Users/lijingru/code/qwen-2.5/backend/agent.py)
 - 微信通道入口位于 [channels/wechat/app.py](/Users/lijingru/code/qwen-2.5/channels/wechat/app.py)
 
+## 后端策略
+
+当前项目的推荐后端策略是：
+
+- v1.0 默认使用 `CPU`
+- `PyTorch/Transformers + MPS` 仅作为实验路径
+- Apple Silicon 上如果要继续追本地 GPU 推理，优先研究 `MLX / mlx-lm`
+
+补充说明：
+
+- 我们已经验证过 `CPU` 可以稳定跑通 v1.0 链路
+- `PyTorch/Transformers + MPS` 在当前机器上出现了 `MPSTemporaryNDArray ... total bytes of NDArray > 2**32`
+- 因此，MPS 不再作为 v1.0 默认方案
+
+MLX 路线规划见 [docs/mlx.md](/Users/lijingru/code/qwen-2.5/docs/mlx.md)。
+当前独立实验脚本见 [experiments/mlx_qwen_smoke.py](/Users/lijingru/code/qwen-2.5/experiments/mlx_qwen_smoke.py)。
+
 ## 版本路线
 
 ### APP v1.0：基础 Demo
@@ -51,6 +68,7 @@ qwen-2.5/
 - 局域网/模拟器访问
 - 仅支持 `Qwen2.5-0.5B` 与 `Qwen2.5-3B`
 - 保留 `model_id` 和 `stream` 扩展接口，但不实现流式输出
+- 默认后端为 `CPU`
 
 详细计划见 [docs/app-v1-plan.md](/Users/lijingru/code/qwen-2.5/docs/app-v1-plan.md)。
 
@@ -65,6 +83,7 @@ qwen-2.5/
 - 聊天页面优化
 - 对话管理
 - 不改变 v1.0 已经固定的基础协议
+- 评估是否引入 `MLX` 作为 Apple Silicon 上的可选推理后端
 
 ### APP v2.0：多模型支持
 
@@ -257,6 +276,12 @@ def chat(req: ChatRequest):
 uvicorn backend.api_server:app --host 0.0.0.0 --port 8000
 ```
 
+默认环境建议：
+
+- `QWEN_DEVICE=cpu`
+- 先在 CPU 上把 v1.0 功能链路跑通
+- Apple GPU 路线作为单独实验项推进，不与 v1.0 主线耦合
+
 ## Android 路线的优点
 
 - 对后端约束最少。
@@ -270,6 +295,7 @@ uvicorn backend.api_server:app --host 0.0.0.0 --port 8000
 - 如果本机没有公网入口，外网设备无法访问。
 - 如果接口长时间不返回，App 端需要自己做超时和重试。
 - 两个 Qwen2.5 规格的性能差异会带来体验差异。
+- `PyTorch/Transformers + MPS` 在 Apple Silicon 上可能不稳定。
 
 ## 推荐结论
 
