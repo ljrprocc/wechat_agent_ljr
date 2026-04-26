@@ -45,9 +45,9 @@ qwen-2.5/
 
 当前代码实现补充：
 
-- `backend/agent.py` 已经开始按 `MLX` 后端重构
-- 当前 API 侧模型调用固定走 `MLX`
-- `CPU + transformers` 仍保留为前一阶段的规划基线，不再代表当前实现状态
+- `backend/agent.py` 已经切到 backend 抽象结构
+- 当前 API 已支持 `MODEL_BACKEND=mlx|transformers`
+- 当前默认配置仍为 `MLX`
 
 补充说明：
 

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.backends.mlx_backend import MlxChatBackend
+from backend.backends import create_backend
+from backend.backends.base import ChatBackend
 from backend.model_registry import ModelRegistry
 from backend.runtime import RuntimeSettings
 from backend.session_store import SessionStore
@@ -13,7 +14,7 @@ class LocalChatAgent:
         self.settings = settings
         self.registry = registry or ModelRegistry.from_settings(settings)
         self.store = SessionStore(settings.db_path)
-        self.backend = MlxChatBackend(registry=self.registry, settings=self.settings)
+        self.backend: ChatBackend = create_backend(settings=self.settings, registry=self.registry)
 
     def list_models(self) -> list[dict[str, Any]]:
         return self.registry.list_models(loaded_model_ids=self.backend.loaded_model_ids())
@@ -57,6 +58,7 @@ class LocalChatAgent:
 
     def status(self) -> dict[str, Any]:
         return {
+            "model_backend": self.settings.model_backend,
             "default_model_id": self.registry.default_model_id,
             "supported_models": self.list_models(),
             "db_path": self.settings.db_path,

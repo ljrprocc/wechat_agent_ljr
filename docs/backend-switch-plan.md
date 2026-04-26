@@ -1,6 +1,6 @@
 # 可切换推理后端重构计划
 
-状态：`Draft`
+状态：`In Progress`
 
 ## 目标
 
@@ -12,6 +12,13 @@
 - 新增 `mlx` 路线
 - `backend/api_server.py` 不感知底层推理实现差异
 - Android 端继续沿用现有 `/api/chat` 协议
+
+## 当前进度
+
+- `M1` 已完成：`runtime.py`、`session_store.py`、`model_registry.py`、`backends/base.py` 已落地
+- `M2` 已完成：`transformers_backend.py` 已落地，`agent.py` 已改为依赖 backend 抽象
+- 当前 API 已支持 `MODEL_BACKEND=mlx|transformers`
+- 当前默认配置仍保持 `MODEL_BACKEND=mlx`
 
 ## 当前事实
 
@@ -29,7 +36,7 @@
 - 不在单个类里堆大量 `if backend == ...`
 - 尽量复用现有模型注册、会话存储、接口层
 - 先对齐最小聊天能力，再扩展高级参数
-- 默认配置仍然保持 `transformers`
+- 默认配置按当前 Apple Silicon 实现保持 `mlx`
 
 ## 推荐目录结构
 
@@ -85,7 +92,7 @@ qwen-2.5/
 建议新增：
 
 ```env
-MODEL_BACKEND=transformers
+MODEL_BACKEND=mlx
 ```
 
 可选值：
@@ -130,6 +137,8 @@ class ChatBackend(Protocol):
 
 ### M1：抽离公共模块
 
+状态：`Completed`
+
 目标：
 
 - 把当前 `backend/agent.py` 里的共性逻辑拆出来
@@ -147,6 +156,8 @@ class ChatBackend(Protocol):
 - `transformers` 路线仍能继续工作
 
 ### M2：迁移 transformers backend
+
+状态：`Completed`
 
 目标：
 
