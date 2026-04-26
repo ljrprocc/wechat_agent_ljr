@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from backend.backends import create_backend
+from backend.backends.base import BackendChatResult
 from backend.backends.base import ChatBackend
 from backend.model_registry import ModelRegistry
 from backend.runtime import RuntimeSettings
 from backend.session_store import SessionStore
+
+
+@dataclass(frozen=True)
+class AgentReplyResult:
+    reply: str
+    debug: dict[str, Any] | None = None
 
 
 class LocalChatAgent:
@@ -26,6 +34,22 @@ class LocalChatAgent:
         model_id: str | None = None,
         stream: bool = False,
     ) -> str:
+        return self.reply_with_debug(
+            session_id=session_id,
+            user_text=user_text,
+            model_id=model_id,
+            stream=stream,
+            debug=False,
+        ).reply
+
+    def reply_with_debug(
+        self,
+        session_id: str,
+        user_text: str,
+        model_id: str | None = None,
+        stream: bool = False,
+        debug: bool = False,
+    ) -> AgentReplyResult:
         if stream:
             raise NotImplementedError("Streaming responses are reserved for v1.x and are not implemented in v1.0.")
 
@@ -36,11 +60,11 @@ class LocalChatAgent:
         if not resolved_session_id:
             raise ValueError("session_id cannot be empty")
         if not text:
-            return "我收到的是空消息，可以再发一次。"
+            return AgentReplyResult(reply="我收到的是空消息，可以再发一次。")
 
         if text in {"/reset", "/clear", "重置对话", "清空对话"}:
             self.store.clear(resolved_session_id, resolved_model.model_id)
-            return "当前会话记忆已清空。"
+            return AgentReplyResult(reply="当前会话记忆已清空。")
 
         history = self.store.get_recent_messages(
             resolved_session_id,
@@ -51,14 +75,22 @@ class LocalChatAgent:
         messages.extend(history)
         messages.append({"role": "user", "content": text})
 
-        answer = self.backend.chat(resolved_model.model_id, messages)
+        backend_result: BackendChatResult = self.backend.chat(
+            resolved_model.model_id,
+            messages,
+            capture_debug=(self.settings.debug_mode or debug),
+        )
         self.store.append(resolved_session_id, resolved_model.model_id, "user", text)
-        self.store.append(resolved_session_id, resolved_model.model_id, "assistant", answer)
-        return answer
+        self.store.append(resolved_session_id, resolved_model.model_id, "assistant", backend_result.text)
+        return AgentReplyResult(
+            reply=backend_result.text,
+            debug=backend_result.debug.to_dict() if backend_result.debug else None,
+        )
 
     def status(self) -> dict[str, Any]:
         return {
             "model_backend": self.settings.model_backend,
+            "debug_mode": self.settings.debug_mode,
             "default_model_id": self.registry.default_model_id,
             "supported_models": self.list_models(),
             "db_path": self.settings.db_path,

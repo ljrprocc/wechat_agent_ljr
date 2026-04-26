@@ -1,6 +1,6 @@
 # 可切换推理后端重构计划
 
-状态：`In Progress`
+状态：`Completed`
 
 ## 目标
 
@@ -17,6 +17,8 @@
 
 - `M1` 已完成：`runtime.py`、`session_store.py`、`model_registry.py`、`backends/base.py` 已落地
 - `M2` 已完成：`transformers_backend.py` 已落地，`agent.py` 已改为依赖 backend 抽象
+- `M3` 已完成：`mlx_backend.py` 已正式接入，支持本地目录优先、`eos_token` 配置和 debug 指标
+- `M4` 已完成：已补启动说明、`/healthz` 检查说明和回归清单
 - 当前 API 已支持 `MODEL_BACKEND=mlx|transformers`
 - 当前默认配置仍保持 `MODEL_BACKEND=mlx`
 
@@ -122,8 +124,7 @@ MLX_QWEN_PREFER_LOCAL=1
 
 ```python
 class ChatBackend(Protocol):
-    def chat(self, messages: list[dict[str, str]], model_id: str) -> str: ...
-    def list_models(self) -> list[dict[str, Any]]: ...
+    def chat(self, model_id: str, messages: list[dict[str, str]], *, capture_debug: bool = False) -> BackendChatResult: ...
     def status(self) -> dict[str, Any]: ...
 ```
 
@@ -175,6 +176,8 @@ class ChatBackend(Protocol):
 
 ### M3：新增 mlx backend
 
+状态：`Completed`
+
 目标：
 
 - 把独立 smoke test 里的可用逻辑收敛成正式 backend
@@ -190,8 +193,11 @@ class ChatBackend(Protocol):
 - `MODEL_BACKEND=mlx` 时可跑通 `qwen2.5-0.5b`
 - `MODEL_BACKEND=mlx` 时可跑通 `qwen2.5-3b`
 - Android 端无需修改请求协议
+- debug 模式下可返回延迟和吞吐量指标
 
 ### M4：联调与文档
+
+状态：`Completed`
 
 目标：
 
@@ -202,6 +208,7 @@ class ChatBackend(Protocol):
 - `.env.example` 更新
 - `docs/mlx.md` 更新
 - 启动说明与回归清单
+- [docs/backend-runbook.md](/Users/lijingru/code/qwen-2.5/docs/backend-runbook.md)
 
 验收标准：
 

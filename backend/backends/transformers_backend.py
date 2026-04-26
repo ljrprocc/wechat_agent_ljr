@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import threading
+from time import perf_counter
 from typing import Any
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+from backend.backends.base import BackendChatResult, BackendDebugMetrics
 from backend.model_registry import ModelRegistry, ModelSpec
 from backend.runtime import RuntimeSettings
 
@@ -74,7 +76,8 @@ class TransformersModelClient:
             return self._model.device
         return next(self._model.parameters()).device
 
-    def chat(self, messages: list[dict[str, str]]) -> str:
+    def chat(self, messages: list[dict[str, str]], *, capture_debug: bool = False) -> BackendChatResult:
+        total_started = perf_counter()
         self._load()
 
         prompt = self._tokenizer.apply_chat_template(
@@ -85,6 +88,7 @@ class TransformersModelClient:
         inputs = self._tokenizer([prompt], return_tensors="pt")
         device = self._model_device()
         inputs = {name: tensor.to(device) for name, tensor in inputs.items()}
+        prompt_tokens = int(inputs["input_ids"].shape[1]) if capture_debug else None
 
         generate_kwargs = {
             "max_new_tokens": self.settings.max_new_tokens,
@@ -102,12 +106,37 @@ class TransformersModelClient:
         else:
             generate_kwargs["do_sample"] = False
 
+        generation_started = perf_counter()
         with self._infer_lock, torch.inference_mode():
             generated = self._model.generate(**inputs, **generate_kwargs)
+        generation_elapsed = perf_counter() - generation_started
+        total_elapsed = perf_counter() - total_started
 
         output_ids = generated[0][inputs["input_ids"].shape[1] :]
         reply = self._tokenizer.decode(output_ids, skip_special_tokens=True)
-        return _clip_text(reply, self.settings.max_reply_chars)
+        clipped = _clip_text(reply, self.settings.max_reply_chars)
+
+        if not capture_debug:
+            return BackendChatResult(text=clipped)
+
+        generated_tokens = int(output_ids.shape[0])
+        tokens_per_second = None
+        if generated_tokens > 0 and generation_elapsed > 0:
+            tokens_per_second = generated_tokens / generation_elapsed
+
+        return BackendChatResult(
+            text=clipped,
+            debug=BackendDebugMetrics(
+                backend="transformers",
+                model_id=self.model_spec.model_id,
+                latency_ms=total_elapsed * 1000,
+                generation_ms=generation_elapsed * 1000,
+                prompt_tokens=prompt_tokens,
+                generated_tokens=generated_tokens,
+                tokens_per_second=tokens_per_second,
+                model_source=self.model_spec.model_path,
+            ),
+        )
 
 
 class TransformersChatBackend:
@@ -131,8 +160,14 @@ class TransformersChatBackend:
             self._clients[model_id] = TransformersModelClient(model_spec=model_spec, settings=self.settings)
             return self._clients[model_id]
 
-    def chat(self, model_id: str, messages: list[dict[str, str]]) -> str:
-        return self._get_client(model_id).chat(messages)
+    def chat(
+        self,
+        model_id: str,
+        messages: list[dict[str, str]],
+        *,
+        capture_debug: bool = False,
+    ) -> BackendChatResult:
+        return self._get_client(model_id).chat(messages, capture_debug=capture_debug)
 
     def loaded_model_ids(self) -> set[str]:
         return {model_id for model_id, client in self._clients.items() if client.loaded}

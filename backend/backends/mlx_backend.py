@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import threading
+from time import perf_counter
 from pathlib import Path
 from typing import Any
 
+from backend.backends.base import BackendChatResult, BackendDebugMetrics
 from backend.model_registry import ModelRegistry, ModelSpec
 from backend.runtime import RuntimeSettings
 
@@ -13,6 +15,24 @@ def _clip_text(text: str, limit: int) -> str:
     if len(text) <= limit:
         return text
     return text[: limit - 12].rstrip() + "\n\n[内容已截断]"
+
+
+def _count_tokens(tokenizer: Any, text: str) -> int | None:
+    encode = getattr(tokenizer, "encode", None)
+    if callable(encode):
+        try:
+            return len(encode(text))
+        except Exception:
+            pass
+
+    try:
+        encoded = tokenizer(text)
+        if isinstance(encoded, dict) and "input_ids" in encoded:
+            return len(encoded["input_ids"])
+    except Exception:
+        return None
+
+    return None
 
 
 def _load_mlx_modules() -> tuple[Any, Any, Any]:
@@ -85,15 +105,18 @@ class MlxModelClient:
 
         return messages[-1]["content"]
 
-    def chat(self, messages: list[dict[str, str]]) -> str:
+    def chat(self, messages: list[dict[str, str]], *, capture_debug: bool = False) -> BackendChatResult:
+        total_started = perf_counter()
         self._load()
 
         generate, _, make_sampler = _load_mlx_modules()
         prompt = self._build_prompt(messages)
+        prompt_tokens = _count_tokens(self._tokenizer, prompt) if capture_debug else None
         sampler = None
         if self.settings.temperature > 0 or self.settings.top_p > 0:
             sampler = make_sampler(temp=self.settings.temperature, top_p=self.settings.top_p)
 
+        generation_started = perf_counter()
         with self._infer_lock:
             response = generate(
                 self._model,
@@ -103,8 +126,31 @@ class MlxModelClient:
                 sampler=sampler,
                 verbose=False,
             )
+        generation_elapsed = perf_counter() - generation_started
+        total_elapsed = perf_counter() - total_started
+        clipped = _clip_text(response, self.settings.max_reply_chars)
 
-        return _clip_text(response, self.settings.max_reply_chars)
+        if not capture_debug:
+            return BackendChatResult(text=clipped)
+
+        generated_tokens = _count_tokens(self._tokenizer, response)
+        tokens_per_second = None
+        if generated_tokens and generation_elapsed > 0:
+            tokens_per_second = generated_tokens / generation_elapsed
+
+        return BackendChatResult(
+            text=clipped,
+            debug=BackendDebugMetrics(
+                backend="mlx",
+                model_id=self.model_spec.model_id,
+                latency_ms=total_elapsed * 1000,
+                generation_ms=generation_elapsed * 1000,
+                prompt_tokens=prompt_tokens,
+                generated_tokens=generated_tokens,
+                tokens_per_second=tokens_per_second,
+                model_source=self.source,
+            ),
+        )
 
 
 class MlxChatBackend:
@@ -128,8 +174,14 @@ class MlxChatBackend:
             self._clients[model_id] = MlxModelClient(model_spec=model_spec, settings=self.settings)
             return self._clients[model_id]
 
-    def chat(self, model_id: str, messages: list[dict[str, str]]) -> str:
-        return self._get_client(model_id).chat(messages)
+    def chat(
+        self,
+        model_id: str,
+        messages: list[dict[str, str]],
+        *,
+        capture_debug: bool = False,
+    ) -> BackendChatResult:
+        return self._get_client(model_id).chat(messages, capture_debug=capture_debug)
 
     def loaded_model_ids(self) -> set[str]:
         return {model_id for model_id, client in self._clients.items() if client.loaded}

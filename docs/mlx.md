@@ -310,6 +310,7 @@ python experiments/mlx_qwen_smoke.py --model ./mlx/Qwen2.5-0.5B-Instruct-4bit --
 不建议现在立刻把主线从 `transformers` 全量迁到 `mlx-lm`，因为这会把“v1.0 App Demo”与“Apple GPU 实验”绑死在一起。
 
 如果要继续推进成正式的可切换后端，重构计划见 [docs/backend-switch-plan.md](/Users/lijingru/code/qwen-2.5/docs/backend-switch-plan.md)。
+实际启动和回归命令见 [docs/backend-runbook.md](/Users/lijingru/code/qwen-2.5/docs/backend-runbook.md)。
 
 ## 当前落地状态
 

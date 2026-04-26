@@ -32,6 +32,7 @@ class RuntimeSettings:
     model_backend: str
     model_config_path: str
     default_model_id: str
+    debug_mode: bool
     device: str
     device_map: str
     torch_dtype: str
@@ -54,6 +55,7 @@ class RuntimeSettings:
             model_backend=os.getenv("MODEL_BACKEND", "mlx"),
             model_config_path=os.getenv("QWEN_MODEL_CONFIG_PATH", "./config/models/qwen2.5.json"),
             default_model_id=os.getenv("QWEN_DEFAULT_MODEL_ID", "qwen2.5-0.5b"),
+            debug_mode=_env_bool("AGENT_DEBUG", False),
             device=os.getenv("QWEN_DEVICE", "auto"),
             device_map=os.getenv("QWEN_DEVICE_MAP", "auto"),
             torch_dtype=os.getenv("QWEN_TORCH_DTYPE", "auto"),

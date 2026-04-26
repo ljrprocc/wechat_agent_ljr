@@ -57,6 +57,7 @@ qwen-2.5/
 
 MLX 路线规划见 [docs/mlx.md](/Users/lijingru/code/qwen-2.5/docs/mlx.md)。
 当前独立实验脚本见 [experiments/mlx_qwen_smoke.py](/Users/lijingru/code/qwen-2.5/experiments/mlx_qwen_smoke.py)。
+后端启动与回归清单见 [docs/backend-runbook.md](/Users/lijingru/code/qwen-2.5/docs/backend-runbook.md)。
 
 ## 版本路线
 
@@ -138,7 +139,8 @@ MLX 路线规划见 [docs/mlx.md](/Users/lijingru/code/qwen-2.5/docs/mlx.md)。
   "session_id": "android-user-001",
   "message": "你好，帮我介绍一下自己",
   "model_id": "qwen2.5-0.5b",
-  "stream": false
+  "stream": false,
+  "debug": false
 }
 ```
 
@@ -150,6 +152,25 @@ MLX 路线规划见 [docs/mlx.md](/Users/lijingru/code/qwen-2.5/docs/mlx.md)。
   "session_id": "android-user-001",
   "model_id": "qwen2.5-0.5b",
   "stream": false
+}
+```
+
+调试模式下，响应会额外返回 `debug` 字段，例如：
+
+```json
+{
+  "reply": "你好，我是一个本地部署的 Qwen 助手。",
+  "session_id": "android-user-001",
+  "model_id": "qwen2.5-0.5b",
+  "stream": false,
+  "debug": {
+    "backend": "mlx",
+    "latency_ms": 1804.84,
+    "generation_ms": 428.91,
+    "prompt_tokens": 49,
+    "generated_tokens": 14,
+    "tokens_per_second": 32.64
+  }
 }
 ```
 

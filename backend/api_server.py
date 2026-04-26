@@ -17,6 +17,7 @@ class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1)
     model_id: str = "qwen2.5-0.5b"
     stream: bool = False
+    debug: bool = False
 
 
 class ChatResponse(BaseModel):
@@ -24,6 +25,7 @@ class ChatResponse(BaseModel):
     session_id: str
     model_id: str
     stream: bool
+    debug: dict[str, Any] | None = None
 
 
 @app.get("/healthz")
@@ -34,14 +36,15 @@ def healthz() -> dict[str, Any]:
     }
 
 
-@app.post("/api/chat", response_model=ChatResponse)
+@app.post("/api/chat", response_model=ChatResponse, response_model_exclude_none=True)
 def chat(req: ChatRequest) -> ChatResponse:
     try:
-        reply = agent.reply(
+        result = agent.reply_with_debug(
             session_id=req.session_id,
             user_text=req.message,
             model_id=req.model_id,
             stream=req.stream,
+            debug=req.debug,
         )
     except NotImplementedError as exc:
         raise HTTPException(status_code=501, detail=str(exc)) from exc
@@ -49,8 +52,9 @@ def chat(req: ChatRequest) -> ChatResponse:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return ChatResponse(
-        reply=reply,
+        reply=result.reply,
         session_id=req.session_id,
         model_id=req.model_id,
         stream=False,
+        debug=result.debug,
     )
